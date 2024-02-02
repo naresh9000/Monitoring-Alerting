@@ -1,0 +1,21 @@
+#sudo nano /etc/alertmanager/alertmanager.yml
+
+route:
+  # Receiver name for notification
+  receiver: "gmail"
+  # grouping definition
+  group_by: ["alertname", "Service", "Stage", "Role"]
+  group_wait: 30s
+  group_interval: 1m
+  repeat_interval: 1m
+
+receivers:
+  # any name of Receiver
+  - name: "gmail"
+    email_configs:
+      - to: "    <naresh.service9000@gmail.com>"
+        from: "<naresh.service9000@gmail.com>"
+        smarthost: smtp.gmail.com:587
+        auth_username: "<naresh.service9000@gmail.com>"
+        auth_identity: "<naresh.service9000@gmail.com>"
+        auth_password: "<copy-the-auth-pass>"

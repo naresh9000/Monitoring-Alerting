@@ -1,0 +1,27 @@
+groups:
+  - name: WebS_appilication_servers
+    rules:
+      - alert: InstanceDown
+        expr: up{job="webs_application_servers"} == 0
+        for: 1m
+      - alert: Memrory Less Than 200MB
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 200 < 10
+        for: 1m
+        labels:
+          severity: warning
+      - alert: HostHighCpuLoad
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 50
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host high CPU load (instance {{ $labels.instance }})
+          description: "CPU load is > 50%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      - alert: HostOutOfDiskSpace
+        expr: (node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes < 10 and ON (instance, device, mountpoint) node_filesystem_readonly == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host out of disk space (instance {{ $labels.instance }})
+          description: "Disk is almost full (< 10% left)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
