@@ -19,23 +19,27 @@ sudo useradd --no-create-home --shell /bin/false prometheus
 sudo mkdir /etc/prometheus
 sudo mkdir /var/lib/prometheus
 sudo chown -R prometheus:prometheus /var/lib/prometheus
-wget https://github.com/prometheus/prometheus/releases/download/v2.45.3/prometheus-2.45.3.linux-amd64.tar.gz -P /tmp
+wget https://github.com/prometheus/prometheus/releases/download/v2.47.1/prometheus-2.47.1.linux-amd64.tar.gz -P /tmp
 cd /tmp
-tar xvf /tmp/prometheus-2.45.3.linux-amd64.tar.gz
+tar xvf /tmp/prometheus-2.47.1.linux-amd64.tar.gz
 
 **The provided commands are used to copy the Prometheus binary and related files to appropriate locations and set the ownership to the prometheus user and group:**
 
-sudo cp /tmp/prometheus-2.45.3.linux-amd64/prometheus /usr/local/bin/
-sudo cp /tmp/prometheus-2.45.3.linux-amd64/promtool /usr/local/bin/
+sudo cp /tmp/prometheus-2.47.1.linux-amd64/prometheus /usr/local/bin/
+sudo cp /tmp/prometheus-2.47.1.linux-amd64/promtool /usr/local/bin/
 sudo chown prometheus:prometheus /usr/local/bin/prometheus
 sudo chown prometheus:prometheus /usr/local/bin/promtool
-sudo cp -r /tmp/prometheus-2.45.3.linux-amd64/consoles /etc/prometheus
-sudo cp -r /tmp/prometheus-2.45.3.linux-amd64/console_libraries /etc/prometheus
+sudo cp -r /tmp/prometheus-2.47.1.linux-amd64/consoles /etc/prometheus
+sudo cp -r /tmp/prometheus-2.47.1.linux-amd64/console_libraries /etc/prometheus
 sudo chown -R prometheus:prometheus  /etc/prometheus/consoles
 sudo chown -R prometheus:prometheus  /etc/prometheus/console_libraries
 
 ls -ltr /usr/local/bin/ | grep prom
 
+**optional**
+setting the ownership for directories..and for data storage..
+sudo mkdir -p /data
+sudo chown -R prometheus:prometheus /data/
 
 
 3.sudo nano /etc/prometheus/prometheus.yml
@@ -43,14 +47,18 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'prometheus_private'
+  - job_name: 'node_exporter'
         scrape_interval: 5s
         static_configs:
-        - targets: ['localhost:9090']
-  - job_name: 'prometheus_public'
+        - targets: ['localhost:9100']
+  - job_name: 'prometheus_public_self_system_metrics'
         scrape_interval: 5s
         static_configs:
         - targets: ['ec2-18-60-216-32.ap-south-2.compute.amazonaws.com:9090']
+  - job_name: 'jenkins'
+    metrics_path: '/prometheus'
+    static_configs:
+      - targets: ['<your-jenkins-ip>:<your-jenkins-port>']
 
 4.	sudo nano /etc/systemd/system/prometheus.service
 [Unit]
@@ -58,21 +66,28 @@ Description=Prometheus
 Wants=network-online.target
 After=network-online.target
 
+StartLimitIntervalSec=500
+StartLimitBurst=5
+
 [Service]
 User=prometheus
 Group=prometheus
+Restart=on-failure
+RestartSec=5s
 Type=simple
 ExecStart=/usr/local/bin/prometheus \
 --config.file=/etc/prometheus/prometheus.yml \
---storage.tsdb.path=/var/lib/prometheus/ \
+--storage.tsdb.path=/data \
 --web.console.templates=/etc/prometheus/consoles \
 --web.console.libraries=/etc/prometheus/console_libraries \
+--web.listen-address=0.0.0.0:9090 \
 --web.enable-lifecycle \
 --web.enable-admin-api \
 --log.level=info
 
 [Install]
 WantedBy=multi-user.target
+
 
 5.	Start & Check Prometheus Status
 sudo systemctl daemon-reload
@@ -110,13 +125,19 @@ sudo chown node_exporter:node_exporter /usr/local/bin/node_exporter
 nano /lib/systemd/system/node_exporter.service
 [Unit]
 Description=Node Exporter
-After=network.target
+Wants=network-online.target
+After=network-online.target
+
+StartLimitIntervalSec=500
+StartLimitBurst=5
 
 [Service]
 User=node_exporter
 Group=node_exporter
 Type=simple
-ExecStart=/usr/local/bin/node_exporter
+Restart=on-failure
+RestartSec=5s
+ExecStart=/usr/local/bin/node_exporter --collector.logind
 
 [Install]
 WantedBy=multi-user.target
